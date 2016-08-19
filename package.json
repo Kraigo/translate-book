@@ -1,0 +1,14 @@
+{
+    "name": "translate-book",
+    "version": "1.0.0",
+    "description": "Translate Book",
+    "main": "index.js",
+    "scripts": {
+        "test": "index.js"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "yandex-translate": "^2.1.0"
+    }
+}
