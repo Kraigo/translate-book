@@ -4,7 +4,8 @@
     "description": "Translate Book",
     "main": "index.js",
     "scripts": {
-        "test": "index.js"
+        "test": "index.js",
+        "create": "express translate-book"
     },
     "author": "",
     "license": "ISC",
