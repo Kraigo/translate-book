@@ -10,6 +10,7 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
-        "yandex-translate": "^2.1.0"
+        "app-root-path": "^2.0.1",
+        "google-translate-api": "^2.3.0"
     }
 }

@@ -1,7 +1,7 @@
-var booktranslateBookparse = require('translate-book');
+const translateBook = require('./index'); //require('translate-book'); 
 
-// const book = 'Evan_Hanter__Three_Blind_Mice.fb2';
-const book = 'Jungle_Book-Rudyard_Kipling.fb2';
-translateBook(book, { level: 1 }, function(path) {
+const bookUrl = './books/1 - Harry Potter and the Philos - J.K. Rowling.fb2';
+
+translateBook(bookUrl, { level: 1 }, function(path) {
     console.log(path)
 });
