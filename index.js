@@ -113,6 +113,10 @@ function parseRateWords(bookData) {
             return rate;
         }, {});
 
+        fs.writeFile(dist + '/rate.txt', Object.keys(bookDataRate)
+        .map(key => `${key}: ${bookDataRate[key]}`).join('\n'), function() {
+        });
+
     return Object.keys(bookDataRate)
         .map(key => {
             return {
