@@ -20,15 +20,27 @@ function bookParse(bookSrc, _options, callback) {
 
     fs.readFile(bookSrc, 'utf8', function(err, data) {
 
-        var bookBody = data.match(/<body>[\s\S]+?<\/body>/im)[0];
+        var bookBody = data
+            .match(/<body>[\s\S]+?<\/body>/im)[0];
 
         var bookDataRate = parseRateWords(bookBody, options);
 
+        fs.writeFile(
+            dist + '/rate-filterd.txt',
+            bookDataRate.map(e => `${e.original}: ${e.rate}`).join('\n'),
+            function() {
+            }
+        );
+
+        console.log('bookDataRate', bookDataRate.length)
+
+        
         translateBook(bookDataRate)
             .then(function(translations) {
 
+        console.log('translations', translations.length)
                 var bookBodyTranslated = fillBookBody(bookBody, translations);
-                var newBook = data.replace(/<body>[\s\S]+?<\/body>/im, '<body>' + bookBodyTranslated + '<\/body>');
+                var newBook = data.replace(/<body>[\s\S]+?<\/body>/im, bookBodyTranslated);
                 var filename = path.basename(bookSrc);
                 var newBookSrc = dist + '/' + filename.replace(/(.*?)\.(\w+)$/, '$1_EnRu.$2');
 
@@ -40,9 +52,8 @@ function bookParse(bookSrc, _options, callback) {
 }
 
 function translateBook(bookDataRate, callback) {
-    var chunkSize = 10;
-    var bookDataRateGroups = bookDataRate        
-        .slice(0, 100)
+    var chunkSize = 100;
+    var bookDataRateGroups = bookDataRate
         .map( function(e,i) { 
             return i % chunkSize===0
                 ? bookDataRate.slice(i,i+chunkSize)
@@ -59,6 +70,7 @@ function translateBook(bookDataRate, callback) {
             }, '');
         return translate(translateData, { to: 'ru' })
             .then(response => {
+                console.log('Group translation received');
                 var result = response.text.split('\n');
                 group.forEach((item, i) => {
                     item.translation = result[i]
@@ -75,30 +87,6 @@ function translateBook(bookDataRate, callback) {
     
 }
 
-function cleanTags(bookBody) {
-    return bookBody
-        .toLowerCase()
-
-    .replace(/<\/?(.*?)>/g, '') // remove all <*>
-
-    .replace(/\s{2,}/g, ' ') // remove double space
-
-    .replace(/[^\s\w'’]/g, '') // remove symbols non-word
-
-    .replace(/\d/g, '') // remove numbers
-
-    .split(' ')
-
-    .map((word) => { // remove 'quotes' for each word
-        word = word.replace(/^[^\w]+/, '');
-        word = word.replace(/[^\w]{1,}\w*$/, '');
-        return word;
-    })
-
-    .filter(item => item && item.length > 2) // remove nulls and < 3 chars
-
-    .join(' ');
-}
 
 function parseRateWords(bookData) {
     var bookDataRate = bookData
@@ -125,25 +113,16 @@ function parseRateWords(bookData) {
             }
         })
         .filter(item =>  item.rate <= options.minRate)
+        .filter(item => item.original.length > 1)
         .sort((a, b) => b.rate - a.rate);
-}
-
-function uniqueWords(bookBody) {
-    return bookBody
-        .split(' ')
-        .reduce(function(accum, current) {
-            if (accum.indexOf(current) < 0) {
-                accum.push(current);
-            }
-            return accum;
-        }, [])
-        .join(' ');
 }
 
 function fillBookBody(bookBody, translations) {
     return translations.reduce(function(bookBody, tr) {
-        var re = new RegExp('(\\b' + tr.original + '\\b)(?![^<]*>)', "gim");
-        bookBody = bookBody.replace(re, '$1 <i>/' + tr.translation + '/</i> ');
+
+        // TODO Replace only real words!
+        var re = new RegExp('([^<]\\b)(' + tr.original + ')(\\b[^>])', 'gi');
+        bookBody = bookBody.replace(re, '$1$2 <i>/' + tr.translation + '/</i>$3');
         return bookBody;
     }, bookBody);
 }
