@@ -1,57 +1,61 @@
 'use strict';
 const fs = require('fs');
-const extend = require('util')._extend;
 const translate = require('google-translate-api');
 const appRoot = require('app-root-path');
 const path = require('path');
 
-var options = {
-    minRate: 13
-}
-const dist = appRoot + '/translated'
-
-if (!fs.existsSync(dist)) {
-    fs.mkdirSync(dist);
+const _options = {
+    maxRate: 10,
+    debug: false,
+    dist: appRoot + '/translated'
 }
 
-function bookParse(bookSrc, _options, callback) {
+function translateBookFile(bookSrc, options) {
+    options = Object.assign({}, options, _options);
 
-    options = extend(options, _options);
+    if (!fs.existsSync(options.dist)) {
+        fs.mkdirSync(options.dist);
+    }
 
-    fs.readFile(bookSrc, 'utf8', function(err, data) {
+    return new Promise((resolve, reject) => {
 
-        var bookBody = data
-            .match(/<body>[\s\S]+?<\/body>/im)[0];
-
-        var bookDataRate = parseRateWords(bookBody, options);
-
-        fs.writeFile(
-            dist + '/rate-filterd.txt',
-            bookDataRate.map(e => `${e.original}: ${e.rate}`).join('\n'),
-            function() {
-            }
-        );
-
-        console.log('bookDataRate', bookDataRate.length)
-
-        
-        translateBook(bookDataRate)
-            .then(function(translations) {
-
-        console.log('translations', translations.length)
-                var bookBodyTranslated = fillBookBody(bookBody, translations);
-                var newBook = data.replace(/<body>[\s\S]+?<\/body>/im, bookBodyTranslated);
-                var filename = path.basename(bookSrc);
-                var newBookSrc = dist + '/' + filename.replace(/(.*?)\.(\w+)$/, '$1_EnRu.$2');
-
-                fs.writeFile(newBookSrc, newBook, function() {
-                    callback(newBookSrc);
-                });
-            });
+        fs.readFile(bookSrc, 'utf8', function(err, data) {
+            
+            translateBook(data)
+                .then(function(newBook) {
+                    var filename = path.basename(bookSrc);
+                    var newBookSrc = options.dist + '/' + filename.replace(/(.*?)\.(\w+)$/, '$1_EnRu.$2');
+                    fs.writeFile(newBookSrc, newBook, function() {
+                        resolve(newBookSrc);
+                    });
+                })            
+        })
     })
 }
 
-function translateBook(bookDataRate, callback) {
+function translateBook(data, options) {
+
+    options = Object.assign({}, options, _options);
+
+    var bookBody = data.match(/<body>[\s\S]+?<\/body>/im)[0];
+    var bookDataRate = parseRateWords(bookBody, options);
+
+    if (options.debug) {
+        fs.writeFile(
+            options.dist + '/rate-filtered.txt',
+            bookDataRate.map(e => `${e.original}: ${e.rate}`).join('\n'),
+            function() {}
+        );
+    }
+
+    return translateRates(bookDataRate)
+            .then(function(translations) {
+                var bookBodyTranslated = translateBody(bookBody, translations);
+                return data.replace(/<body>[\s\S]+?<\/body>/im, bookBodyTranslated);
+            });
+}
+
+function translateRates(bookDataRate) {
     var chunkSize = 100;
     var bookDataRateGroups = bookDataRate
         .map( function(e,i) { 
@@ -70,7 +74,6 @@ function translateBook(bookDataRate, callback) {
             }, '');
         return translate(translateData, { to: 'ru' })
             .then(response => {
-                console.log('Group translation received');
                 var result = response.text.split('\n');
                 group.forEach((item, i) => {
                     item.translation = result[i]
@@ -88,9 +91,9 @@ function translateBook(bookDataRate, callback) {
 }
 
 
-function parseRateWords(bookData) {
+function parseRateWords(bookData, options) {
     var bookDataRate = bookData
-        .replace(/<\/?[^>]>/g, '')
+        .replace(/<\/?[^>]\/?>/g, '')
         .match(/\b[a-z'’\-]+\b/gi)
         .map(e => e.toLowerCase())
         .reduce(function(rate, item) {
@@ -101,9 +104,13 @@ function parseRateWords(bookData) {
             return rate;
         }, {});
 
-        fs.writeFile(dist + '/rate.txt', Object.keys(bookDataRate)
-        .map(key => `${key}: ${bookDataRate[key]}`).join('\n'), function() {
-        });
+        if (options.debug) {
+            fs.writeFile(
+                dist + '/rate.txt',
+                Object.keys(bookDataRate).map(key => `${key}: ${bookDataRate[key]}`).join('\n'),
+                function() {}
+            );
+        }
 
     return Object.keys(bookDataRate)
         .map(key => {
@@ -112,20 +119,21 @@ function parseRateWords(bookData) {
                 rate: bookDataRate[key]
             }
         })
-        .filter(item =>  item.rate <= options.minRate)
+        .filter(item =>  item.rate <= options.maxRate)
         .filter(item => item.original.length > 1)
         .sort((a, b) => b.rate - a.rate);
 }
 
-function fillBookBody(bookBody, translations) {
+function translateBody(bookBody, translations) {
     return translations.reduce(function(bookBody, tr) {
-
-        // TODO Replace only real words!
-        var re = new RegExp('([^<]\\b)(' + tr.original + ')(\\b[^>])', 'gi');
-        bookBody = bookBody.replace(re, '$1$2 <i>/' + tr.translation + '/</i>$3');
+        var re = new RegExp('\\b(' + tr.original + ')\\b(?!\\s?\/?>)', 'gi');
+        bookBody = bookBody.replace(re, '$1 <i>/' + tr.translation + '/</i>');
         return bookBody;
     }, bookBody);
 }
 
 
-module.exports = bookParse;
+module.exports = {
+    translateBookFile,
+    translateBook
+}
