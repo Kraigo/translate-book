@@ -3,6 +3,8 @@ const fs = require('fs');
 const translate = require('google-translate-api');
 const appRoot = require('app-root-path');
 const path = require('path');
+const WordPOS = require('wordpos');
+const wordpos = new WordPOS({stopwords: true});
 
 const _options = {
     maxRate: 10,
@@ -22,18 +24,18 @@ function translateBookFile(bookSrc, options) {
         fs.readFile(bookSrc, 'utf8', function(err, data) {
             
             translateBook(data)
-                .then(function(newBook) {
-                    var filename = path.basename(bookSrc);
-                    var newBookSrc = options.dist + '/' + filename.replace(/(.*?)\.(\w+)$/, '$1_EnRu.$2');
-                    fs.writeFile(newBookSrc, newBook, function() {
-                        resolve(newBookSrc);
-                    });
-                })            
+                // .then(function(newBook) {
+                //     var filename = path.basename(bookSrc);
+                //     var newBookSrc = options.dist + '/' + filename.replace(/(.*?)\.(\w+)$/, '$1_EnRu.$2');
+                //     fs.writeFile(newBookSrc, newBook, function() {
+                //         resolve(newBookSrc);
+                //     });
+                // })            
         })
     })
 }
 
-function translateBook(data, options) {
+function translateBook2(data, options) {
 
     options = Object.assign({}, options, _options);
 
@@ -53,6 +55,25 @@ function translateBook(data, options) {
                 var bookBodyTranslated = translateBody(bookBody, translations);
                 return data.replace(/<body>[\s\S]+?<\/body>/im, bookBodyTranslated);
             });
+}
+
+function translateBook(data, options) {
+    options = Object.assign({}, options, _options);
+
+    let bookBody = getBodyText(data);
+    let rates = {}
+    bookBody.reduce((promise, p) => {
+
+        return promise.then(() => {
+            return wordpos.getPOS(p)
+                .then((stats) => {
+
+                })
+        });
+
+    }, Promise.resolve())
+
+    // return Promise.reject();
 }
 
 function translateRates(bookDataRate) {
@@ -130,6 +151,18 @@ function translateBody(bookBody, translations) {
         bookBody = bookBody.replace(re, '$1 <i>/' + tr.translation + '/</i>');
         return bookBody;
     }, bookBody);
+}
+
+function getBodyText(data) {
+    let matchBody = data.match(/<body>[\s\S]+?<\/body>/im);
+
+    if (!matchBody)
+        throw new Error("File incorrect. <body> missed");
+    
+    return matchBody[0]
+        .match(/<p>.+<\/p>/g)
+        .map(p => p.replace(/<\/?[^>]+\/?>/g, ''))
+        .filter(p => p);
 }
 
 
