@@ -1,6 +1,7 @@
 const translateBook = require('./index'); //require('translate-book'); 
+const path = require('path');
 
-const bookUrl = './books/1 - Harry Potter and the Philos - J.K. Rowling.fb2';
+const bookUrl = path.join(__dirname, './books/Kerroll_Alice-s-Adventures-in-Wonderland-illustrated.93955.fb2');
 
 translateBook.translateBookFile(bookUrl, {})
     .then(function(path) {

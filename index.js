@@ -1,6 +1,6 @@
 'use strict';
 const fs = require('fs');
-const translate = require('google-translate-api');
+const dict = require('enru-dict');
 const appRoot = require('app-root-path');
 const path = require('path');
 
@@ -11,7 +11,7 @@ const _options = {
 }
 
 function translateBookFile(bookSrc, options) {
-    options = Object.assign({}, options, _options);
+    options = Object.assign({}, _options, options);
 
     if (!fs.existsSync(options.dist)) {
         fs.mkdirSync(options.dist);
@@ -20,7 +20,7 @@ function translateBookFile(bookSrc, options) {
     return new Promise((resolve, reject) => {
 
         fs.readFile(bookSrc, 'utf8', function(err, data) {
-            
+            if (err) throw err;
             translateBook(data)
                 .then(function(newBook) {
                     var filename = path.basename(bookSrc);
@@ -35,7 +35,7 @@ function translateBookFile(bookSrc, options) {
 
 function translateBook(data, options) {
 
-    options = Object.assign({}, options, _options);
+    options = Object.assign({}, _options, options);
 
     var bookBody = data.match(/<body>[\s\S]+?<\/body>/im)[0];
     var bookDataRate = parseRateWords(bookBody, options);
@@ -55,38 +55,60 @@ function translateBook(data, options) {
             });
 }
 
-function translateRates(bookDataRate) {
-    var chunkSize = 100;
-    var bookDataRateGroups = bookDataRate
-        .map( function(e,i) { 
-            return i % chunkSize===0
-                ? bookDataRate.slice(i,i+chunkSize)
-                : null; 
-        })
-        .filter(e => !!e );
-
-    return Promise.all(bookDataRateGroups.map(group => {
-        let translateData = group
-            .map(item => item.original)
-            .reduce((out, item) => {
-                out += item + "\n";
-                return out;
-            }, '');
-        return translate(translateData, { to: 'ru' })
-            .then(response => {
-                var result = response.text.split('\n');
-                group.forEach((item, i) => {
-                    item.translation = result[i]
-                });
-                return group;
+function translateRates(bookDataRate, chunk) {
+    if (chunk) {
+        var chunkSize = 100;
+        var bookDataRateGroups = bookDataRate
+            .map( function(e,i) { 
+                return i % chunkSize===0
+                    ? bookDataRate.slice(i,i+chunkSize)
+                    : null; 
             })
-    }))
-    .then((result) => {
-        return result.reduce((all, group) => all.concat(group), []);
+            .filter(e => !!e );
+    }
+
+    return new Promise((resolve) => {
+        var result = bookDataRate
+            .map(item => 
+                Object.assign({}, item, {
+                    translation: dict.enru(item.original)
+                })
+            )
+            .filter(item => item.translation)
+
+        resolve(result);
     })
-    .catch(err => {
-        console.log(err);  
-    });
+
+
+
+    // return Promise.all(bookDataRateGroups.map(group => {
+    //     let translateData = group
+    //         .map(item => item.original)
+    //         .reduce((out, item) => {
+    //             out += item + "\n";
+    //             return out;
+    //         }, '');
+
+    //     dict.enru()
+
+    //     return translate(translateData, { to: 'ru', engine: 'libre' })
+    //         .then(response => {
+    //             console.log("RESPOSE", response)
+    //             var result = response.text.split('\n');
+    //             group.forEach((item, i) => {
+    //                 item.translation = result[i]
+    //             });
+    //             return group;
+    //         })
+
+        
+    // }))
+    // .then((result) => {
+    //     return result.reduce((all, group) => all.concat(group), []);
+    // })
+    // .catch(err => {
+    //     console.log(err);  
+    // });
     
 }
 
