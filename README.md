@@ -26,4 +26,4 @@ translateBook.translateBookFile(bookUrl, params)
 - debug - boolean
 - dist - string
 
-Live demo: [translate-book.herokuapp.com](https://translate-book.herokuapp.com/)
+Live demo: [translate-book.herokuapp.com](https://translatebook.herokuapp.com/)
